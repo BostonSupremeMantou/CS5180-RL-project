@@ -20,5 +20,8 @@ build/
 # checkpoints/
 # results/logs/
 
-# Full video archive (use data/ for the 25 curated videos only)
+﻿# Full video archive (use data/ for the 25 curated videos only)
 archive/
+
+# Raw and processed gesture data
+data/
