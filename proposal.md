@@ -1,50 +1,52 @@
 \begin{center}
-\LARGE\textbf{Adaptive Computation Allocation in Real-Time Video Inference via Reinforcement Learning}
+\LARGE\textbf{Adaptive Computation Allocation for Visual Tracking using Reinforcement Learning}
 \end{center}
 
 \vspace{1em}
 
 ## 1. Problem Description
 
-Real-time video inference systems (e.g., object detection, segmentation) face a tension: high accuracy demands expensive, dense computation every frame, while latency and resource constraints require frugal compute. *Adaptive computation allocation* applies expensive computation only where needed—typically where the scene has changed—and reuses features elsewhere (Bolukbasi et al., 2017; Bengio et al., 2016). This project studies the problem in a synthetic environment that mimics block-level compressed-domain cues (residual and motion proxies, feature age) and a per-step compute budget, without real video decoding or external detectors. The formulation is designed so that successful policies could in principle transfer to settings where such features are extracted from real compressed streams (e.g., motion vectors and residuals from video codecs).
+Object detectors such as YOLO achieve strong accuracy but incur substantial cost when run on every frame of a video. In relatively stable scenes (e.g., underwater fish tracking), full detection each timestep is often redundant. *Adaptive computation allocation* applies expensive inference only when needed and relies on cheaper updates otherwise (Bolukbasi et al., 2017; Bengio et al., 2016). This project studies this trade-off in a **real video** setting: a fixed fish detector (YOLO) provides full detections when invoked, while a reinforcement learning agent learns **when** to call full detection versus lighter alternatives.
 
-**Formal formulation.** The problem is modeled as a **Markov Decision Process (MDP)**.
+**Formal formulation.** The problem is modeled as a **Markov Decision Process (MDP)** (possibly **partially observed** in extensions; see Stage 2).
 
-- **State space $\mathcal{S}$:** For each of 9 or 16 blocks, the state includes: (1) synthetic block-level residual and motion proxies (e.g., scalar features from a simple stochastic process), (2) feature age (steps since last full update), (3) remaining compute budget. Global state is the concatenation of per-block features plus budget. Episodes have moderate length (50–100 steps) so training remains tractable while the allocation problem is non-trivial.
+- **State space $\mathcal{S}$:** A **10-dimensional** vector (Stage~1) derived each step: frame-difference statistic; normalized box $(c_x,c_y,w,h)$; detector confidence; velocity $(v_x,v_y)$; **IoU** between the current prediction and the **offline teacher** box at the same frame; **normalized time since last FULL\_DETECT** (encourages learning when to refresh). Stage~2 stacks the last $k$ such vectors (default $k=4$) for a $10k$-dimensional input to the same Q-head family. The environment consumes raw frames; the agent does not change detector weights.
 
-- **Action space $\mathcal{A}$:** For each block, actions are **REUSE** (use cached features) or **FULL UPDATE** (expensive computation). Joint actions are subject to at most $K$ FULL updates per step. With 9 blocks, the joint action space has $2^9$ possibilities (budget-constrained); with 16 blocks, actions are factorized (e.g., per-block Q-heads) to avoid $2^{16}$ enumeration.
+- **Action space $\mathcal{A}$:** Three discrete actions: **FULL_DETECT** (run the full YOLO forward pass on the frame or region policy), **LIGHT_UPDATE** (e.g., optical flow or prediction-based box update without full detection), **REUSE** (keep the previous estimate with minimal computation). Costs and implementation details of LIGHT_UPDATE are fixed by the environment so the agent learns a scheduling policy.
 
-- **Rewards $\mathcal{R}$:** Rewards encode the trade-off between inference quality and cost. Quality is proxied by analytical drift $f(\mathrm{age}, \mathrm{residual})$ (no real detector). Cost is a negative term for compute (e.g., number of FULL updates). Thus $R = \lambda_q \cdot (-\mathrm{drift}) - \lambda_c \cdot C(a)$, with discounting for short-horizon quality and cost.
+- **Rewards $\mathcal{R}$:** Balance tracking quality against compute. A practical form is $R_t = \mathrm{IoU}_t - \lambda \, c(a_t)$, where $\mathrm{IoU}_t$ compares the predicted box to a reference (e.g., pseudo-ground truth from an offline always-detect run or held-out labels), $c(a_t)$ is the cost of action $a_t$, and $\lambda \geq 0$ controls the accuracy–compute trade-off. Discounted cumulative return is used for episodic training over video clips.
 
-**Why this is non-trivial.** (1) **Shared resource constraints:** Blocks compete for a finite budget, so the optimal policy couples decisions across blocks. (2) **Quality–cost trade-off:** The agent must learn when to spend (FULL) vs save (REUSE). (3) **Stochastic dynamics:** Synthetic proxies can be randomized (e.g., random walk), so the environment is non-deterministic. These aspects make the problem suitable for value-based RL (e.g., DQN) and comparison against heuristics.
+**Why this is non-trivial.** (1) **Temporal coupling:** Skipping detection saves cost but can cause drift; the agent must anticipate when reuse is safe. (2) **Quality–cost trade-off:** Different $\lambda$ values induce different Pareto points; the policy must not collapse to trivial always-REUSE or always-DETECT without learning. (3) **Partial observability (optional):** Instantaneous hand-crafted features may not summarize occlusion or sudden motion; Stage 2 can address this with recurrent value functions.
 
-**Domain and simulator.** A custom synthetic environment will be built: no real compressed video or codec. Block-level features are generated by a simple stochastic model (e.g., bounded random walk or hand-crafted rules); drift = $f(\mathrm{age}, \mathrm{residual})$. The environment will be implemented as a Gymnasium-compatible API. To my knowledge, this block-level allocation setting with synthetic features and shared budget has not been used as an RL benchmark before. The setup aligns with *adaptive inference* and *sparse computation* under resource limits.
+**Domain.** Gymnasium-compatible environment stepping over preprocessed video frames. A pretrained or finetuned YOLO model serves as the **fixed** full detector (no backbone redesign required for the core proposal). Existing training and annotation scripts in the repository support dataset and detector preparation.
 
-## 2. Algorithms
+## 2. Work Plan: Stage 1 and Stage 2
 
-The project focuses on **one learned method** and **two heuristic baselines**.
+**Stage 1 (core deliverable, as implemented).** End-to-end pipeline: offline **teacher** generation (`preprocess`: full-frame YOLO → `.npz`), three **non-learning baselines**, Gymnasium environment `FishTrackingEnv` with a **10-dimensional** state, and **Dueling + Double DQN** (MLP with LayerNorm; Huber TD loss; replay buffer; target network with optional **Polyak** soft updates; $\varepsilon$-greedy). **Lagrangian-style adaptive $\lambda$** during training (updates toward a target mean per-step cost) with optional **fixed-$\lambda$** mode. Training **presets** (`robust` / `intense`) and periodic **metrics CSV** for learning curves. *(Legacy path: an 8-dim vanilla MLP checkpoint format remains loadable for backward compatibility.)*
 
-**Centralized DQN (main method).** A single agent observes the full state (all block features and global budget) and outputs a joint action (REUSE or FULL per block), implemented via a deep Q-network (Mnih et al., 2015). With 9 blocks, the action space has size $2^9$ (constrained by budget); with 16 blocks, a factorized representation (e.g., per-block binary outputs with shared backbone) is used. Double DQN and target networks for stability. This is the primary learned policy and demonstrates that RL can outperform simple heuristics for budget allocation.
+**Stage 2 (as implemented).** Same video, detector, and action set. **Temporal context** via **stacking the last $k$ single-step observations** (default $k{=}4$, 40-dim input) into the same Dueling MLP head (wider hidden layers; `stage2_intense` preset). Optional **state ablation** masks (zeroing feature groups such as frame-difference or teacher-IoU). **Pareto-style experiment:** train separate policies at several **fixed** training-$\lambda$ values (shorter budget per point) and plot mean IoU vs.\ mean action cost. **Evaluation** script aggregates baselines, Stage~1 DQN, and Stage~2 DQN. *Not implemented in code:* full **DRQN / LSTM**; **prioritized replay (PER)**—listed as optional extensions for the report.
 
-**Heuristic baselines (two).** (1) *Threshold-based:* FULL update when residual or motion proxy exceeds a fixed threshold, else REUSE; budget consumed in order of block index or proxy magnitude until exhausted. (2) *Age-based:* FULL for blocks whose feature age exceeds $T$ steps (oldest-first until budget exhausted). These baselines validate that the problem benefits from learning.
+## 3. Algorithms and Baselines
 
-**Independent Q-learning (IQL), optional.** If time permits, IQL (Tan, 1993) will be implemented: each block is an independent agent with local observations (local block features, feature age, shared remaining budget) and binary action (REUSE/FULL), with joint actions constrained by the global budget (e.g., rank Q-values and grant FULL to top-$K$ blocks).
+**DQN family (main method).** Experience replay and a **target network** following Mnih et al.\ (2015); training uses **Double DQN** for bootstrap action selection and a **Dueling** architecture (state value + action advantages; Wang et al., 2016). Stage~1 default: **10-d** `TrackingDQN`; Stage~2: same head on **stacked** observations. $\varepsilon$-greedy exploration.
 
-**Implementation.** PyTorch with a custom DQN or minimal RL library; Gymnasium-compatible environment. All algorithms evaluated under the same compute budget and analytical drift proxy. DQN is well-suited to discrete action spaces and provides a clear learned baseline; heuristics offer interpretable, low-complexity comparisons and help quantify the benefit of learning.
+**Baselines (non-learned).** (1) **Always FULL_DETECT**—accuracy upper bound, cost upper bound. (2) **Periodic detection**—full detect every $N$ frames, else reuse. (3) **Optical-flow-only LIGHT_UPDATE**—isolates the value of learned scheduling.
 
-## 3. Results
+**Implementation.** PyTorch; Ultralytics YOLO for FULL_DETECT; Gymnasium; entry points `python -m stage_1.main` (preprocess / train / eval), `python -m stage_2.training.train_stage2`, and `python -m stage_2.main compare`.
 
-**Evaluation metrics.** (1) **Quality proxy:** Average drift over blocks and time (lower is better). (2) **Efficiency:** Compute cost per step (e.g., number of FULL updates) and Pareto curves (quality vs. cost). (3) **Stability:** Variance of returns over several seeds (e.g., 5). Ablations over 2–3 budget sizes will be included.
+## 4. Expected Results and Evaluation
 
-**Expected comparisons.** Centralized DQN is expected to achieve a better quality–cost trade-off than both heuristic baselines under the same budget. The project will report learning curves and a final performance table (DQN vs. threshold-based vs. age-based). If IQL is implemented, a brief comparison with DQN will be included. The experiments will clarify how much gain comes from learned allocation versus simple rules, and how sensitive performance is to the compute budget.
+**Metrics.** (1) **Tracking accuracy:** mean IoU (and related statistics) vs. a reference. (2) **Compute cost:** proxy such as fraction of frames with FULL_DETECT, wall-clock, or FLOPs-style counts tied to actions. (3) **Trade-off:** curves of accuracy vs. cost when varying $\lambda$ or budget.
 
-**Risks and fallback plans.** (1) *Training instability:* DQN can be unstable with sparse rewards. *Fallback:* Denser reward, reduce blocks to 9 if needed, tune learning rate and replay buffer, double DQN. (2) *Quality proxy too simple:* If drift is trivial, add more variance in synthetic dynamics or a more structured drift formula. (3) *Limited time:* Deliver MDP + environment, Centralized DQN + two heuristics, and quantitative comparison; IQL optional.
+**Expected outcome.** The learned policy should **reduce** average compute relative to always FULL_DETECT while maintaining **comparable** IoU for a suitable choice of $\lambda$, and improve over fixed periodic schedules in some regimes.
 
-By the project deadline, the project is expected to demonstrate: (1) a well-defined MDP and synthetic environment, (2) working Centralized DQN and two heuristic baselines, (3) IQL if time permits, and (4) quantitative comparison of quality–cost trade-offs.
+**Risks and fallback plans.** (1) *Sparse or noisy rewards:* teacher IoU signal and $\lambda$ tuning; optional reward shaping (future). (2) *Training instability:* Huber loss, gradient clipping, replay capacity, Polyak target updates, and training presets already used in code. (3) *Limited time:* Stage~1 + one Stage~2 axis (stacked observations + Pareto) is the delivered scope; PER/DRQN remain report-level extensions if not run.
 
-## References
+By the deadline, the project demonstrates: (1) a defined MDP over **real video** with a **fixed** YOLO detector, (2) **working Dueling+Double DQN** and the listed baselines, (3) quantitative **accuracy–compute** comparisons and **Pareto** points, and (4) **Stage~2** stacked-observation policy compared to Stage~1 under the same evaluation protocol.
+
+## 5. References
 
 - T. Bolukbasi, J. Wang, O. Dekel, and V. Saligrama. Adaptive neural networks for efficient inference. *ICML*, 2017.
 - E. Bengio, P.-L. Bacon, J. Pineau, and D. Precup. Conditional computation in neural networks for faster models. *ICLR*, 2016 (arXiv:1511.06297, 2015).
-- M. Tan. Multi-agent reinforcement learning: Independent vs. cooperative agents. *ICML*, 1993.
 - V. Mnih et al. Human-level control through deep reinforcement learning. *Nature*, 2015.
+- Z. Wang, T. Schaul, M. Hessel, H. van Hasselt, M. Lanctot, and N. de Freitas. Dueling network architectures for deep reinforcement learning. *ICML*, 2016.
