@@ -6,7 +6,7 @@ Stage 2 入口（仓库根目录）:
 Pareto:
   python -m stage_2.tools.run_pareto --train --eval
 
-主训练（默认 stage2_intense + stack-k=4）:
+主训练（默认 stage2_intense + stack-k=4；无需 teacher）:
   python -m stage_2.training.train_stage2 --device mps
 """
 

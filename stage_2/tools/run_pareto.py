@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""固定 λ 训练多个 Stage2 策略并评估，得到 IoU–cost Pareto 散点（CSV + PNG）。"""
+"""固定 λ 训练多个 Stage2 策略并评估，得到 consistency–cost Pareto 散点（CSV + PNG）。"""
 
 from __future__ import annotations
 
@@ -30,9 +30,16 @@ def train_pareto_points(
     out_dir: Path,
     imgsz: int,
     max_episode_steps: int,
+    video_path: Path | None = None,
+    teacher_npz: Path | None = None,
 ) -> None:
+    from stage_1.utils.paths import VIDEO_PATH as VPATH
     from stage_2.training.train_stage2 import train_stage2
     from stage_2.utils.paths import STAGE2_CHECKPOINTS
+
+    vp = video_path if video_path is not None else VPATH
+    if not vp.is_file():
+        raise SystemExit(f"找不到训练视频: {vp}")
 
     out_dir = out_dir.resolve()
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -41,6 +48,8 @@ def train_pareto_points(
         save = out_dir / f"pareto_lam_{tag}.pt"
         print(f"\n=== Pareto train λ={lam} -> {save.name} ===")
         train_stage2(
+            video_path=vp,
+            teacher_npz=teacher_npz,
             stack_k=stack_k,
             ablation=ablation,
             total_steps=steps,
@@ -94,7 +103,7 @@ def eval_pareto_points(
     from stage_1.env.fish_tracking_env import FishTrackingEnv
     from stage_1.evaluation.baselines import rollout_episode
     from stage_1.models.dqn import load_q_from_checkpoint, select_action_greedy
-    from stage_1.utils.paths import DEFAULT_TEACHER_NPZ, VIDEO_PATH, WEIGHTS_PATH
+    from stage_1.utils.paths import VIDEO_PATH, WEIGHTS_PATH
     from stage_2.env.wrappers import build_stage2_env
 
     try:
@@ -123,13 +132,13 @@ def eval_pareto_points(
         def pol(obs: np.ndarray, _s: int) -> int:
             return select_action_greedy(q, obs, dev)
 
-        rets, ious, costs = [], [], []
+        rets, cons, costs = [], [], []
         for ep in range(n_episodes):
             seed = seeds[ep % len(seeds)]
             kw = dict(
                 video_path=VIDEO_PATH,
-                teacher_npz=DEFAULT_TEACHER_NPZ,
                 yolo_weights=WEIGHTS_PATH,
+                teacher_npz=None,
                 lambda_cost=lam_trained,
                 max_episode_steps=max_episode_steps,
                 imgsz=imgsz,
@@ -139,7 +148,7 @@ def eval_pareto_points(
             env_ep = build_stage2_env(be, stack_k=stack_k, ablation=abl)
             st = rollout_episode(env_ep, pol, seed=seed)
             rets.append(st["return"])
-            ious.append(st["mean_iou"])
+            cons.append(st["mean_consistency"])
             costs.append(st["mean_cost"])
 
         rows.append(
@@ -147,12 +156,12 @@ def eval_pareto_points(
                 "checkpoint": path.name,
                 "lambda_train": lam_trained,
                 "mean_return": float(np.mean(rets)),
-                "mean_iou": float(np.mean(ious)),
+                "mean_consistency": float(np.mean(cons)),
                 "mean_cost": float(np.mean(costs)),
             }
         )
         print(
-            f"{path.name}: λ_train={lam_trained:.4f} mean_iou={np.mean(ious):.4f} mean_cost={np.mean(costs):.4f}"
+            f"{path.name}: λ_train={lam_trained:.4f} mean_consistency={np.mean(cons):.4f} mean_cost={np.mean(costs):.4f}"
         )
 
     out_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -162,7 +171,7 @@ def eval_pareto_points(
         w.writerows(rows)
 
     xs = [r["mean_cost"] for r in rows]
-    ys = [r["mean_iou"] for r in rows]
+    ys = [float(r.get("mean_consistency", r.get("mean_iou", 0))) for r in rows]
     lbs = [f"λ={r['lambda_train']:.2f}" for r in rows]
 
     fig, ax = plt.subplots(figsize=(6.5, 4.5))
@@ -170,7 +179,7 @@ def eval_pareto_points(
     for x, y, lb in zip(xs, ys, lbs):
         ax.annotate(lb, (x, y), textcoords="offset points", xytext=(4, 4), fontsize=8)
     ax.set_xlabel("mean action cost (eval)")
-    ax.set_ylabel("mean IoU vs teacher")
+    ax.set_ylabel("mean flow consistency (IoU vs flow ref)")
     ax.set_title("Pareto-style frontier (fixed-λ policies, Stage2 stack)")
     ax.grid(True, alpha=0.35)
     fig.tight_layout()
@@ -210,6 +219,8 @@ def main() -> None:
         type=Path,
         default=STAGE2_ROOT / "outputs" / "pareto_iou_vs_cost.png",
     )
+    ap.add_argument("--video-path", type=Path, default=None)
+    ap.add_argument("--teacher-npz", type=Path, default=None)
     args = ap.parse_args()
 
     if not args.train and not args.eval:
@@ -218,6 +229,10 @@ def main() -> None:
 
     lambs = _parse_lambdas(args.lambdas)
     if args.train:
+        tn = Path(args.teacher_npz) if args.teacher_npz is not None else None
+        if tn is not None and not tn.is_file():
+            print(f"[warn] --teacher-npz 不存在 ({tn})，按无 teacher 训练")
+            tn = None
         train_pareto_points(
             lambdas=lambs,
             steps=args.steps,
@@ -228,6 +243,8 @@ def main() -> None:
             out_dir=args.ckpt_dir,
             imgsz=args.imgsz,
             max_episode_steps=args.max_episode_steps,
+            video_path=args.video_path,
+            teacher_npz=tn,
         )
     if args.eval:
         eval_pareto_points(

@@ -34,9 +34,11 @@ objectives, and stronger experiments.
 
 #### State
 
--   Implemented as **10 features**: frame difference; normalized box; confidence;
-    velocity; **IoU vs offline teacher**; **steps since last FULL** (normalized).
-    (Design doc originally listed four groups; code merges these.)
+-   **10 features**, all computable on a **new video** without a precomputed
+    teacher: frame difference; normalized box; **last YOLO confidence** (with
+    decay under LIGHT); velocity $(v_x,v_y)$; **IoU(pred, flow-warp reference)**
+    where the reference warps the **pre-action** box with the same optical flow
+    used in LIGHT; **steps since last FULL** (normalized).
 
 #### Action Space
 
@@ -46,7 +48,9 @@ objectives, and stronger experiments.
 
 #### Reward Function
 
-reward = accuracy - λ \* compute_cost
+reward = IoU(pred, flow\_reference) − λ · compute\_cost  
+Optional offline teacher: **not** used in state or reward; only for **eval
+logging** (mean IoU vs teacher) when `--teacher-npz` is provided.
 
 ### 3. Environment Design
 
@@ -74,26 +78,26 @@ reward = accuracy - λ \* compute_cost
 
 #### Network
 
--   Input: **10-d** state vector (see environment); output: Q-values for 3 actions.
+-   Input: **10-d** state (see above); output: Q-values for 3 actions. Stage~2:
+    **$10k$-d** stacked input ($k$ frames).
 
 ### 6. Training Pipeline
 
-1.  Preprocess video
-2.  Implement baseline tracker
-3.  Build Gym-like environment
-4.  Train DQN agent
-5.  Evaluate performance
+1.  (Optional) `preprocess` to build teacher `.npz` for **eval-only** IoU vs full-detect
+2.  Baseline trackers + Gym environment
+3.  Train DQN on `--video-path` (default fish video); `--teacher-npz` optional
+4.  Evaluate: **mean flow consistency**, mean cost; optional **mean IoU vs teacher**
 
 ### 7. Evaluation Metrics
 
--   Tracking accuracy (IoU)
--   Compute cost
--   Accuracy vs compute tradeoff
+-   **Mean flow consistency** (training-aligned proxy)
+-   **Optional** mean IoU vs teacher (requires `--teacher-npz` at eval)
+-   Compute cost and return
 
 ### 8. Expected Results (Stage 1)
 
--   Reduced computation vs always FULL_DETECT
--   Comparable accuracy to full detection under a chosen λ
+-   Lower mean cost than always FULL\_DETECT at a chosen $\lambda$
+-   Consistency and (if logged) teacher IoU used as complementary signals
 
 ------------------------------------------------------------------------
 
@@ -150,9 +154,10 @@ Report should relate both to the accuracy–compute trade-off.
 ### 13. Experimental Depth (Recommended for All Stage 2 Runs)
 
 -   **State ablations**: remove or zero out components (e.g., no frame
-    diff, no velocity) and report impact on return and IoU.
--   **Pareto / tradeoff curves**: sweep λ or compute budget; plot
-    accuracy vs cost, not only a single operating point.
+    diff, no velocity, **no\_iou** = no flow-alignment channel) and report
+    impact on return and consistency.
+-   **Pareto / tradeoff curves**: sweep $\lambda$; plot **mean consistency vs
+    mean cost** (optional teacher IoU in a separate figure if teacher is available).
 -   **Failure cases**: short qualitative analysis when the agent sticks
     to REUSE too long or oscillates actions.
 

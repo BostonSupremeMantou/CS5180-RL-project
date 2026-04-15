@@ -17,7 +17,7 @@ from stage_1.evaluation.baselines import (
 )
 from stage_1.evaluation.run_eval import evaluate_policy, write_eval_summary_csv
 from stage_1.models.dqn import load_q_from_checkpoint, select_action_greedy
-from stage_1.utils.paths import CHECKPOINTS_DIR, DEFAULT_TEACHER_NPZ, VIDEO_PATH, WEIGHTS_PATH
+from stage_1.utils.paths import CHECKPOINTS_DIR, VIDEO_PATH, WEIGHTS_PATH
 from stage_2.env.wrappers import build_stage2_env
 from stage_2.utils.paths import STAGE2_CHECKPOINTS
 
@@ -53,22 +53,37 @@ def add_compare_cli(p: argparse.ArgumentParser) -> None:
         help="默认 stage_2/outputs/eval_all_methods.csv",
     )
     p.add_argument("--no-csv", action="store_true")
+    p.add_argument(
+        "--video-path",
+        type=Path,
+        default=None,
+        help="评估用视频（默认 stage_1 默认 fish_video）",
+    )
+    p.add_argument(
+        "--teacher-npz",
+        type=Path,
+        default=None,
+        help="可选；存在时记录 mean_iou_teacher",
+    )
 
 
-def run_compare(args: argparse.Namespace) -> None:
-    from stage_2.utils.paths import STAGE2_ROOT
-
-    if not DEFAULT_TEACHER_NPZ.is_file():
-        raise SystemExit("缺少 teacher，请先 preprocess")
-
-    out_csv = args.out_csv
-    if out_csv is None:
-        out_csv = STAGE2_ROOT / "outputs" / "eval_all_methods.csv"
+def collect_compare_rows(args: argparse.Namespace) -> list[dict]:
+    """Baselines + Stage1 + Stage2 DQN 评估行（不写 CSV）。"""
+    vp = Path(args.video_path) if args.video_path is not None else VIDEO_PATH
+    if not vp.is_file():
+        raise SystemExit(f"找不到视频: {vp}")
+    tn: Path | None = None
+    if args.teacher_npz is not None:
+        tnp = Path(args.teacher_npz)
+        if tnp.is_file():
+            tn = tnp
+        else:
+            print(f"[warn] --teacher-npz 不存在 ({tnp})，按无 teacher 评估")
 
     base_kw = dict(
-        video_path=VIDEO_PATH,
-        teacher_npz=DEFAULT_TEACHER_NPZ,
+        video_path=vp,
         yolo_weights=WEIGHTS_PATH,
+        teacher_npz=tn,
         lambda_cost=args.lambda_cost,
         max_episode_steps=args.max_episode_steps,
         imgsz=args.imgsz,
@@ -168,27 +183,39 @@ def run_compare(args: argparse.Namespace) -> None:
             return select_action_greedy(q2, obs, dev)
 
         print(f"\n=== DQN Stage2 (stack={stack_k}, ablation={abl}) ===")
-        rets, ious, costs = [], [], []
+        rets, cons, teach, costs = [], [], [], []
         for ep in range(args.n_episodes):
             seed = seeds[ep % len(seeds)]
             be = FishTrackingEnv(**kw2, random_start=True, seed=seed)
             env_ep = build_stage2_env(be, stack_k=stack_k, ablation=abl)
             stats = rollout_episode(env_ep, pol2, seed=seed)
             rets.append(stats["return"])
-            ious.append(stats["mean_iou"])
+            cons.append(stats["mean_consistency"])
+            teach.append(float(stats["mean_iou_teacher"]))
             costs.append(stats["mean_cost"])
+            mt = stats["mean_iou_teacher"]
+            ts = f" mean_iou_teacher={mt:.4f}" if not np.isnan(mt) else ""
             print(
                 f"  ep{ep} seed={seed} return={stats['return']:.3f} "
-                f"mean_iou={stats['mean_iou']:.4f} mean_cost={stats['mean_cost']:.4f} steps={stats['steps']}"
+                f"mean_consistency={stats['mean_consistency']:.4f} mean_cost={stats['mean_cost']:.4f}"
+                f" steps={stats['steps']}{ts}"
             )
-        mr, mi, mc = float(np.mean(rets)), float(np.mean(ious)), float(np.mean(costs))
-        print(f"  MEAN return={mr:.4f} mean_iou={mi:.4f} mean_cost={mc:.4f}")
+        mr = float(np.mean(rets))
+        mc = float(np.mean(costs))
+        mcons = float(np.mean(cons))
+        mteach_vals = [x for x in teach if not np.isnan(x)]
+        mteach = float(np.mean(mteach_vals)) if mteach_vals else float("nan")
+        print(
+            f"  MEAN return={mr:.4f} mean_consistency={mcons:.4f} mean_cost={mc:.4f}"
+            + (f" mean_iou_teacher={mteach:.4f}" if mteach_vals else "")
+        )
         rows.append(
             {
                 "policy_id": "dqn_stage2",
                 "policy_name": f"DQN Stage2 (stack={stack_k}, ablation={abl})",
                 "mean_return": mr,
-                "mean_iou": mi,
+                "mean_consistency": mcons,
+                "mean_iou_teacher": mteach,
                 "mean_cost": mc,
                 "n_episodes": args.n_episodes,
                 "lambda_cost": lam2,
@@ -197,6 +224,17 @@ def run_compare(args: argparse.Namespace) -> None:
     else:
         print("\n[Stage2 DQN skipped]")
 
+    return rows
+
+
+def run_compare(args: argparse.Namespace) -> None:
+    from stage_2.utils.paths import STAGE2_ROOT
+
+    out_csv = args.out_csv
+    if out_csv is None:
+        out_csv = STAGE2_ROOT / "outputs" / "eval_all_methods.csv"
+
+    rows = collect_compare_rows(args)
     if not args.no_csv:
         write_eval_summary_csv(rows, out_csv)
         print(f"\n[ok] 对比表 -> {out_csv}")

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 import sys
 from pathlib import Path
 
@@ -24,6 +25,12 @@ def _sort_key(policy_id: str) -> tuple[int, str]:
         return (3, policy_id)
     if policy_id == "dqn_stage2":
         return (4, policy_id)
+    if policy_id.startswith("dqn_stage3_sk"):
+        try:
+            k = int(policy_id.removeprefix("dqn_stage3_sk"))
+        except ValueError:
+            k = 999
+        return (5, f"{k:04d}")
     return (9, policy_id)
 
 
@@ -41,6 +48,9 @@ def _bar_label(policy_id: str) -> str:
         return "DQN\nStage1"
     if policy_id == "dqn_stage2":
         return "DQN\nStage2"
+    if policy_id.startswith("dqn_stage3_sk"):
+        k = policy_id.removeprefix("dqn_stage3_sk")
+        return f"DQN\nS3 sk={k}"
     return policy_id.replace("_", "\n")
 
 
@@ -65,6 +75,11 @@ def main() -> None:
         default=OUTPUTS_DIR,
         help="PNG 输出目录",
     )
+    ap.add_argument(
+        "--suptitle",
+        default="Stage 1: baselines vs DQN (eval means)",
+        help="三联图 eval_compare_all.png 的总标题",
+    )
     args = ap.parse_args()
 
     try:
@@ -82,12 +97,33 @@ def main() -> None:
     if not rows:
         raise SystemExit("CSV 为空")
 
+    def _mean_consistency_row(r: dict[str, str]) -> float:
+        if "mean_consistency" in r and r["mean_consistency"].strip():
+            return float(r["mean_consistency"])
+        return float(r.get("mean_iou", "0") or 0)
+
+    def _mean_teacher_iou_row(r: dict[str, str]) -> float | None:
+        if "mean_iou_teacher" not in r:
+            return None
+        s = (r.get("mean_iou_teacher") or "").strip()
+        if not s or s.lower() == "nan":
+            return None
+        try:
+            v = float(s)
+        except ValueError:
+            return None
+        return v if math.isfinite(v) else None
+
     rows.sort(key=lambda r: _sort_key(r["policy_id"]))
     labels = [_bar_label(r["policy_id"]) for r in rows]
     x = np.arange(len(rows))
     rets = [float(r["mean_return"]) for r in rows]
-    ious = [float(r["mean_iou"]) for r in rows]
+    ious = [_mean_consistency_row(r) for r in rows]
     costs = [float(r["mean_cost"]) for r in rows]
+    teacher_ious: list[float] | None = None
+    tvals = [_mean_teacher_iou_row(r) for r in rows]
+    if tvals and all(v is not None for v in tvals):
+        teacher_ious = [float(v) for v in tvals]
 
     out = args.out_dir
     out.mkdir(parents=True, exist_ok=True)
@@ -118,17 +154,33 @@ def main() -> None:
         plt.close(fig)
 
     one_bar(rets, "Mean episode return", "return", "eval_compare_return.png")
-    one_bar(ious, "Mean IoU vs teacher", "IoU", "eval_compare_iou.png")
+    one_bar(ious, "Mean flow consistency (train signal)", "consistency", "eval_compare_iou.png")
     one_bar(costs, "Mean action cost", "cost", "eval_compare_cost.png")
+    if teacher_ious is not None:
+        one_bar(
+            teacher_ious,
+            "Mean IoU vs teacher box (eval)",
+            "IoU",
+            "eval_compare_teacher_iou.png",
+        )
 
-    # 三联图（便于报告一图展示）
-    fig, axes = plt.subplots(1, 3, figsize=(12, 3.8))
-    for ax, vals, ttl, ylab in zip(
-        axes,
-        (rets, ious, costs),
-        ("Mean return", "Mean IoU", "Mean cost"),
-        ("return", "IoU", "cost"),
-    ):
+    # 三联或四联（含 teacher IoU 时多一列）
+    if teacher_ious is not None:
+        panels = (
+            (rets, "Mean return", "return"),
+            (ious, "Mean consistency", "consistency"),
+            (costs, "Mean cost", "cost"),
+            (teacher_ious, "Mean IoU vs teacher", "IoU"),
+        )
+        fig, axes = plt.subplots(1, 4, figsize=(15.5, 3.8))
+    else:
+        panels = (
+            (rets, "Mean return", "return"),
+            (ious, "Mean consistency", "consistency"),
+            (costs, "Mean cost", "cost"),
+        )
+        fig, axes = plt.subplots(1, 3, figsize=(12, 3.8))
+    for ax, (vals, ttl, ylab) in zip(axes, panels):
         bars = ax.bar(x, vals, color=colors, edgecolor="0.35", linewidth=0.6)
         ax.set_xticks(x)
         ax.set_xticklabels(labels, fontsize=8)
@@ -144,18 +196,21 @@ def main() -> None:
                 va="bottom",
                 fontsize=7,
             )
-    fig.suptitle("Stage 1: baselines vs DQN (eval means)", fontsize=11, y=1.02)
+    fig.suptitle(args.suptitle, fontsize=11, y=1.02)
     fig.tight_layout()
     fig.savefig(out / "eval_compare_all.png", dpi=150, bbox_inches="tight")
     plt.close(fig)
 
     print(f"[ok] 已写入 {out.resolve()}:")
-    for name in (
+    names = [
         "eval_compare_return.png",
         "eval_compare_iou.png",
         "eval_compare_cost.png",
-        "eval_compare_all.png",
-    ):
+    ]
+    if teacher_ious is not None:
+        names.append("eval_compare_teacher_iou.png")
+    names.append("eval_compare_all.png")
+    for name in names:
         print(f"  {name}")
 
 

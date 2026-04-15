@@ -8,10 +8,10 @@
 |------|------|
 | `data/videos/` | 输入视频（默认 `fish_video.mp4`） |
 | `data/weights/` | 检测权重 `best.pt` / `last.pt` |
-| `data/teacher/` | 离线 teacher 轨迹（`preprocess` 生成 `.npz`） |
+| `data/teacher/` | **可选**：离线 teacher（`preprocess` 生成），仅用于评估时对照 IoU |
 | `models/yolo11n.pt` | Ultralytics 预训练起点（可选再训练） |
 | `env/` | Gymnasium 环境 `FishTrackingEnv` |
-| `models/dqn.py` | `TrackingDQN`（Dueling+Double 训练逻辑）；`VanillaDQN` 仅旧 ckpt |
+| `models/dqn.py` | `TrackingDQN`（Dueling+Double）；`VanillaDQN` 仅旧 ckpt |
 | `training/` | Replay buffer、训练循环 |
 | `evaluation/` | 三条 baseline + DQN 评估 |
 | `scripts/` | YOLO 训练、视频画框 |
@@ -22,16 +22,18 @@
 在**仓库根目录** `RL_project/` 下执行（需已 `pip install -r requirements.txt` 并建议使用 `.venv`）：
 
 ```bash
-python -m stage_1.main preprocess --device mps   # 或 cpu
-python -m stage_1.main train --device mps   # 默认 --preset robust；轻量加 --preset none
-# 每 500 步打印 [metrics]；写入 CSV 便于画曲线：
+# 可选：仅为「评估时对照」生成 teacher（训练默认不需要）
+python -m stage_1.main preprocess --device mps
+
+# 训练：默认视频 data/videos/fish_video.mp4，无 teacher；可加 --teacher-npz 仅多记录对照指标
+python -m stage_1.main train --device mps
+python -m stage_1.main train --video-path /path/to/new.mp4 --device mps
 python -m stage_1.main train --metrics-csv stage_1/checkpoints/train_metrics.csv --log-every 250
-# 默认：Dueling+Double DQN + Huber + 拉格朗日自适应 λ（目标平均 cost≈0.32）。固定 λ：
-python -m stage_1.main train --fixed-lambda --lambda-cost 0.35
-# DQN 评估默认随机起点；与 checkpoint 中 λ 对齐：
+
 python -m stage_1.main eval --lambda-from-ckpt
-python -m stage_1.main eval --skip-dqn            # 仅 baseline
-python -m stage_1.main eval                       # 含 DQN（需 checkpoints/dqn_stage1.pt）
+python -m stage_1.main eval --video-path /path/to/new.mp4
+python -m stage_1.main eval --teacher-npz stage_1/data/teacher/teacher_fish_video.npz
+python -m stage_1.main eval --skip-dqn
 ```
 
 单独入口：
@@ -42,17 +44,12 @@ python -m stage_1.evaluation.run_eval --help
 python stage_1/scripts/annotate_video_yolo.py --device mps
 ```
 
-再训练 YOLO（需自备 `data/fish_annotations_half/` 等，见 `tools/prepare_yolo11_fish_dataset.py`）：
-
-```bash
-cd stage_1 && python scripts/train_yolo11n_fish.py --prepare-dataset
-```
-
 ## MDP 摘要
 
-- **状态**：帧差、归一化框 (cx,cy,w,h)、置信度、速度 (vx,vy)、**与 teacher 的 IoU**、**距上次 FULL 的步数（归一化）** — 共 10 维，便于学习何时检测。
-- **动作**：`FULL_DETECT` / `LIGHT_UPDATE`（LK 光流平移框）/ `REUSE`。
-- **奖励**：`IoU - λ * cost(action)`；**λ 训练时默认按「目标平均 cost」自适应**（拉格朗日），也可用 `--fixed-lambda` 固定。
+- **状态（10 维，新视频可算）**：帧差；归一化框；**上次 FULL 的置信度**（LIGHT 时衰减）；速度；**当前框与光流参考框的 IoU**；距上次 FULL 的归一化步数。
+- **动作**：`FULL_DETECT`（跑 YOLO）/ `LIGHT_UPDATE`（LK 光流平移框）/ `REUSE`。
+- **奖励**：`IoU(pred, flow_ref) − λ·cost`；**不依赖 teacher**。若提供 teacher，仅在 `info` / 评估 CSV 中多一列 **mean_iou_teacher** 作对照。
+- **λ**：训练默认自适应（目标平均 cost）；`--fixed-lambda` 固定。
 
 ## 与 Stage 2 的关系
 

@@ -38,21 +38,29 @@ def rollout_episode(
 ) -> dict:
     obs, _ = env.reset(seed=seed)
     total_r = 0.0
-    ious: list[float] = []
+    consistencies: list[float] = []
+    teacher_ious: list[float] = []
     costs: list[float] = []
     step_i = 0
     while True:
         a = policy(obs, step_i)
         obs, r, term, trunc, info = env.step(a)
         total_r += r
-        ious.append(float(info["iou"]))
+        consistencies.append(float(info["consistency_iou"]))
+        it = float(info.get("iou_teacher", float("nan")))
+        if not np.isnan(it):
+            teacher_ious.append(it)
         costs.append(float(info["action_cost"]))
         step_i += 1
         if term or trunc:
             break
+    mcons = float(np.mean(consistencies)) if consistencies else 0.0
+    mteach = float(np.mean(teacher_ious)) if teacher_ious else float("nan")
     return {
         "return": total_r,
-        "mean_iou": float(np.mean(ious)) if ious else 0.0,
+        "mean_consistency": mcons,
+        "mean_iou_teacher": mteach,
+        "mean_iou": mcons,
         "sum_cost": float(np.sum(costs)),
         "mean_cost": float(np.mean(costs)) if costs else 0.0,
         "steps": step_i,

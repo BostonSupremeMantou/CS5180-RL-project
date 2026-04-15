@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 Stage 1 入口（在仓库根目录执行）:
-  python -m stage_1.main preprocess
-  python -m stage_1.main train  [--total-steps 15000 ...]
-  python -m stage_1.main eval   [--n-episodes 3 ...]
+  python -m stage_1.main preprocess   # 可选：仅用于评估对照 teacher
+  python -m stage_1.main train [--video-path ...] [--teacher-npz ...]
+  python -m stage_1.main eval  [--video-path ...] [--teacher-npz ...]
 """
 
 from __future__ import annotations
@@ -34,10 +34,7 @@ def _cmd_preprocess(args: argparse.Namespace) -> None:
 def _cmd_train(args: argparse.Namespace) -> None:
     from stage_1.training.train_args import apply_train_preset
     from stage_1.training.train_dqn import train
-    from stage_1.utils.paths import DEFAULT_TEACHER_NPZ
-
-    if not DEFAULT_TEACHER_NPZ.is_file():
-        raise SystemExit("缺少 teacher，请先: python -m stage_1.main preprocess")
+    from stage_1.utils.paths import DEFAULT_TEACHER_NPZ, VIDEO_PATH
 
     apply_train_preset(args)
     if args.no_cosine_lr:
@@ -47,7 +44,25 @@ def _cmd_train(args: argparse.Namespace) -> None:
     elif not hasattr(args, "use_cosine_lr"):
         args.use_cosine_lr = False
 
+    vp = Path(args.video_path) if args.video_path is not None else VIDEO_PATH
+    if not vp.is_file():
+        raise SystemExit(f"找不到训练视频: {vp}")
+    tn = None
+    if getattr(args, "no_teacher_reward", False):
+        print("[info] --no-teacher-reward：自监督光流奖励，不加载 teacher")
+    elif getattr(args, "teacher_npz", None) is not None:
+        tnp = Path(args.teacher_npz)
+        if tnp.is_file():
+            tn = tnp
+        else:
+            print(f"[warn] --teacher-npz 不存在 ({tnp})，按无 teacher 训练")
+    elif DEFAULT_TEACHER_NPZ.is_file():
+        tn = DEFAULT_TEACHER_NPZ
+        print(f"[info] 未指定 --teacher-npz，使用默认 teacher 参与奖励: {tn}")
+
     train(
+        video_path=vp,
+        teacher_npz=tn,
         total_steps=args.total_steps,
         learning_starts=args.learning_starts,
         train_freq=args.train_freq,

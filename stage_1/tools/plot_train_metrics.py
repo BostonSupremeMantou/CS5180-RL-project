@@ -82,14 +82,21 @@ def main() -> None:
         fig.savefig(out / fname, dpi=150)
         plt.close(fig)
 
+    cons_col = "ep_consistency_ma" if "ep_consistency_ma" in d else "ep_iou_ma"
+    cons_label = "ep_consistency_ma" if cons_col == "ep_consistency_ma" else "ep_iou_ma"
     # 1) 滑动平均 episode 指标
+    ma_series: list[tuple[str, list[float], str]] = [
+        ("ep_ret_ma", d["ep_ret_ma"], "C0"),
+        (cons_label, d[cons_col], "C1"),
+    ]
+    ma_title = "Episode MA: return & flow consistency"
+    if "ep_teacher_iou_ma" in d:
+        ma_series.append(("ep_teacher_iou_ma", d["ep_teacher_iou_ma"], "C4"))
+        ma_title = "Episode MA: return, flow consistency & teacher IoU"
     _plot_xy(
         step,
-        [
-            ("ep_ret_ma", d["ep_ret_ma"], "C0"),
-            ("ep_iou_ma", d["ep_iou_ma"], "C1"),
-        ],
-        "Episode MA: return & IoU",
+        ma_series,
+        ma_title,
         "value",
         "train_episode_ma_ret_iou.png",
     )

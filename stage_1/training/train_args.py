@@ -114,7 +114,12 @@ def build_train_argparser(*, add_help: bool = True) -> argparse.ArgumentParser:
     p.add_argument("--target-mean-cost", type=float, default=0.32)
     p.add_argument("--lambda-lr", type=float, default=0.03)
     p.add_argument("--lambda-initial", type=float, default=0.45)
-    p.add_argument("--lambda-min", type=float, default=0.02)
+    p.add_argument(
+        "--lambda-min",
+        type=float,
+        default=0.12,
+        help="自适应 λ 下限；略高可避免策略几乎永不 FULL",
+    )
     p.add_argument("--lambda-max", type=float, default=1.5)
     p.add_argument("--huber-beta", type=float, default=1.0)
     p.add_argument("--max-episode-steps", type=int, default=200)
@@ -125,4 +130,21 @@ def build_train_argparser(*, add_help: bool = True) -> argparse.ArgumentParser:
     p.add_argument("--log-every", type=int, default=500)
     p.add_argument("--metrics-csv", type=Path, default=None)
     p.add_argument("--metrics-ma-episodes", type=int, default=20)
+    p.add_argument(
+        "--video-path",
+        type=Path,
+        default=None,
+        help="训练用视频（默认 data/videos/fish_video.mp4）",
+    )
+    p.add_argument(
+        "--teacher-npz",
+        type=Path,
+        default=None,
+        help="可选；存在则加载 teacher（有则参与奖励，见 env）；与 --no-teacher-reward 互斥优先后者",
+    )
+    p.add_argument(
+        "--no-teacher-reward",
+        action="store_true",
+        help="强制不加载 teacher：奖励为光流一致性 −λ·cost（即使存在默认 teacher 文件）",
+    )
     return p

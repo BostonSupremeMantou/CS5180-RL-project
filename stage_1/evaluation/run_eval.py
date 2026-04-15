@@ -17,7 +17,6 @@ from stage_1.env.fish_tracking_env import FishTrackingEnv
 from stage_1.models.dqn import load_q_from_checkpoint, select_action_greedy
 from stage_1.utils.paths import (
     CHECKPOINTS_DIR,
-    DEFAULT_TEACHER_NPZ,
     OUTPUTS_DIR,
     VIDEO_PATH,
     WEIGHTS_PATH,
@@ -35,25 +34,37 @@ def evaluate_policy(
     random_start: bool = False,
 ) -> dict[str, float | str | int]:
     print(f"\n=== {policy_name} ===")
-    rets, ious, costs = [], [], []
+    rets, cons, teach, costs = [], [], [], []
     for ep in range(n_episodes):
         seed = seeds[ep % len(seeds)]
         env = FishTrackingEnv(**env_kwargs, random_start=random_start, seed=seed)
         stats = rollout_episode(env, policy_fn, seed=seed)
         rets.append(stats["return"])
-        ious.append(stats["mean_iou"])
+        cons.append(stats["mean_consistency"])
+        teach.append(float(stats["mean_iou_teacher"]))
         costs.append(stats["mean_cost"])
+        mt = stats["mean_iou_teacher"]
+        ts = f" mean_iou_teacher={mt:.4f}" if not np.isnan(mt) else ""
         print(
             f"  ep{ep} seed={seed} return={stats['return']:.3f} "
-            f"mean_iou={stats['mean_iou']:.4f} mean_cost={stats['mean_cost']:.4f} steps={stats['steps']}"
+            f"mean_consistency={stats['mean_consistency']:.4f} mean_cost={stats['mean_cost']:.4f}"
+            f" steps={stats['steps']}{ts}"
         )
-    mr, mi, mc = float(np.mean(rets)), float(np.mean(ious)), float(np.mean(costs))
-    print(f"  MEAN return={mr:.4f} mean_iou={mi:.4f} mean_cost={mc:.4f}")
+    mr = float(np.mean(rets))
+    mc = float(np.mean(costs))
+    mcons = float(np.mean(cons))
+    mteach_vals = [x for x in teach if not np.isnan(x)]
+    mteach = float(np.mean(mteach_vals)) if mteach_vals else float("nan")
+    print(
+        f"  MEAN return={mr:.4f} mean_consistency={mcons:.4f} mean_cost={mc:.4f}"
+        + (f" mean_iou_teacher={mteach:.4f}" if mteach_vals else "")
+    )
     return {
         "policy_id": policy_id,
         "policy_name": policy_name,
         "mean_return": mr,
-        "mean_iou": mi,
+        "mean_consistency": mcons,
+        "mean_iou_teacher": mteach,
         "mean_cost": mc,
         "n_episodes": n_episodes,
     }
@@ -65,7 +76,8 @@ def write_eval_summary_csv(rows: list[dict[str, float | str | int]], path: Path)
         "policy_id",
         "policy_name",
         "mean_return",
-        "mean_iou",
+        "mean_consistency",
+        "mean_iou_teacher",
         "mean_cost",
         "n_episodes",
         "lambda_cost",
@@ -97,6 +109,12 @@ def add_eval_cli_args(p: argparse.ArgumentParser) -> None:
         help="DQN 段用 checkpoint 里的 lambda_cost_final 作为环境 λ（若无则仍用 --lambda-cost）",
     )
     p.add_argument(
+        "--dqn-epsilon-eval",
+        type=float,
+        default=0.0,
+        help="DQN 评估时 ε-greedy（0=纯贪心）；>0 时模拟部署中偶发纠偏/探索",
+    )
+    p.add_argument(
         "--eval-csv",
         type=Path,
         default=OUTPUTS_DIR / "eval_summary.csv",
@@ -107,17 +125,37 @@ def add_eval_cli_args(p: argparse.ArgumentParser) -> None:
         action="store_true",
         help="不写评估汇总 CSV",
     )
+    p.add_argument(
+        "--video-path",
+        type=Path,
+        default=None,
+        help="输入视频（默认 stage_1/data/videos/fish_video.mp4）",
+    )
+    p.add_argument(
+        "--teacher-npz",
+        type=Path,
+        default=None,
+        help="可选；提供且存在时 info 含 teacher IoU，便于与离线全检测对照",
+    )
 
 
 def run_eval_from_namespace(args: argparse.Namespace) -> None:
+    vp = Path(args.video_path) if args.video_path is not None else VIDEO_PATH
+    if not vp.is_file():
+        raise SystemExit(f"找不到视频: {vp}")
 
-    if not DEFAULT_TEACHER_NPZ.is_file():
-        raise SystemExit("缺少 teacher .npz，请先 preprocess")
+    tn: Path | None = None
+    if getattr(args, "teacher_npz", None) is not None:
+        tnp = Path(args.teacher_npz)
+        if tnp.is_file():
+            tn = tnp
+        else:
+            print(f"[warn] --teacher-npz 不存在 ({tnp})，按无 teacher 运行")
 
     base_kw = dict(
-        video_path=VIDEO_PATH,
-        teacher_npz=DEFAULT_TEACHER_NPZ,
+        video_path=vp,
         yolo_weights=WEIGHTS_PATH,
+        teacher_npz=tn,
         lambda_cost=args.lambda_cost,
         max_episode_steps=args.max_episode_steps,
         imgsz=args.imgsz,
@@ -187,13 +225,17 @@ def run_eval_from_namespace(args: argparse.Namespace) -> None:
 
     q = load_q_from_checkpoint(ckpt, torch.device("cpu"))
     dqn_random = not args.dqn_fixed_start
+    eps_eval = float(getattr(args, "dqn_epsilon_eval", 0.0) or 0.0)
 
     def dqn_policy(obs: np.ndarray, _step: int) -> int:
+        if eps_eval > 0.0 and np.random.rand() < eps_eval:
+            return int(np.random.choice([0, 1, 2]))
         return select_action_greedy(q, obs, torch.device("cpu"))
 
+    dqn_label = f"DQN ε={eps_eval}" if eps_eval > 0.0 else "DQN greedy"
     r = evaluate_policy(
         policy_id="dqn_greedy",
-        policy_name=f"DQN greedy (random_start={dqn_random})",
+        policy_name=f"{dqn_label} (random_start={dqn_random})",
         env_kwargs=dqn_kw,
         policy_fn=dqn_policy,
         n_episodes=args.n_episodes,

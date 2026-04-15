@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from stage_1.env.fish_tracking_env import FishTrackingEnv
 from stage_1.models.dqn import TrackingDQN, select_action_epsilon_greedy
+from stage_1.training.n_step import NStepReplayBridge
 from stage_1.training.replay_buffer import ReplayBuffer
 from stage_1.training.train_dqn import _augment_obs_batch, _polyak_update
 from stage_1.utils.paths import DEFAULT_TEACHER_NPZ, VIDEO_PATH, WEIGHTS_PATH
@@ -24,6 +25,8 @@ from stage_2.utils.paths import STAGE2_CHECKPOINTS
 
 def train_stage2(
     *,
+    video_path: Path | None = None,
+    teacher_npz: Path | None = None,
     stack_k: int,
     ablation: str,
     total_steps: int,
@@ -64,22 +67,30 @@ def train_stage2(
     grad_updates: int = 1,
     preset_name: str = "none",
     stage2_preset_name: str = "none",
+    ssf_reward_penalty: float = 0.0,
+    n_step: int = 1,
+    epsilon_tail: float | None = None,
+    epsilon_tail_steps: int = 0,
+    lambda_teacher_iou_floor: float | None = None,
+    lambda_teacher_iou_below: float = 0.35,
 ) -> None:
     dev = torch.device("cpu")
     rng = np.random.default_rng(seed)
     torch.manual_seed(seed)
 
     lam = float(lambda_initial if not fixed_lambda else lambda_cost)
+    vp = Path(video_path) if video_path is not None else VIDEO_PATH
     base = FishTrackingEnv(
-        VIDEO_PATH,
-        DEFAULT_TEACHER_NPZ,
+        vp,
         WEIGHTS_PATH,
+        teacher_npz=teacher_npz,
         lambda_cost=lam,
         max_episode_steps=max_episode_steps,
         imgsz=imgsz,
         device=device_s,
         random_start=True,
         seed=seed,
+        ssf_reward_penalty=ssf_reward_penalty,
     )
     env = build_stage2_env(base, stack_k=stack_k, ablation=ablation)
     state_dim = stage2_state_dim(stack_k)
@@ -106,8 +117,37 @@ def train_stage2(
         )
 
     buf = ReplayBuffer(replay_capacity, state_dim=state_dim, rng=rng)
+    nstep_bridge: NStepReplayBridge | None = None
+    if int(n_step) > 1:
+        nstep_bridge = NStepReplayBridge(int(n_step), float(gamma), buf)
+    gamma_bootstrap = float(gamma) ** float(max(1, int(n_step)))
 
+    def epsilon_at(step_v: int) -> float:
+        if step_v < epsilon_decay_steps:
+            return float(
+                epsilon_end
+                + (epsilon_start - epsilon_end)
+                * max(0.0, 1.0 - step_v / float(max(1, epsilon_decay_steps)))
+            )
+        if epsilon_tail is None or int(epsilon_tail_steps) <= 0:
+            return float(epsilon_end)
+        t = step_v - int(epsilon_decay_steps)
+        if t >= int(epsilon_tail_steps):
+            return float(epsilon_tail)
+        return float(epsilon_end) + (float(epsilon_tail) - float(epsilon_end)) * (
+            t / float(max(1, int(epsilon_tail_steps)))
+        )
+
+    print(
+        f"[Stage2] 首次 reset（含首帧 YOLO）… stack_k={stack_k} "
+        f"log_every={log_every} total_steps={total_steps}",
+        flush=True,
+    )
     obs, _ = env.reset(seed=seed)
+    print(
+        f"[Stage2] 训练循环开始 obs_dim={obs.shape[0]}，进度条与每 {log_every} 步 [metrics] 输出",
+        flush=True,
+    )
     ep_return = 0.0
     ep_len = 0
     ep_actions: list[int] = []
@@ -120,6 +160,7 @@ def train_stage2(
 
     ep_returns_ma = deque(maxlen=max(1, metrics_ma_episodes))
     ep_ious_ma = deque(maxlen=max(1, metrics_ma_episodes))
+    ep_teacher_ma = deque(maxlen=max(1, metrics_ma_episodes))
     ep_comps_ma = deque(maxlen=max(1, metrics_ma_episodes))
     ep_full_frac_ma = deque(maxlen=max(1, metrics_ma_episodes))
 
@@ -142,7 +183,8 @@ def train_stage2(
                 "q_pred_mean",
                 "q_target_mean",
                 "ep_ret_ma",
-                "ep_iou_ma",
+                "ep_consistency_ma",
+                "ep_teacher_iou_ma",
                 "ep_comp_ma",
                 "ep_full_frac_ma",
                 "episodes_done",
@@ -175,22 +217,28 @@ def train_stage2(
                 next_online = q(no)
                 next_act = next_online.argmax(dim=1, keepdim=True)
                 q_next = target(no).gather(1, next_act).squeeze(1)
-                tq = r + gamma * (1.0 - d) * q_next
+                tq = r + gamma_bootstrap * (1.0 - d) * q_next
                 q_pm = float(q_sa.mean().cpu())
                 q_tm = float(tq.mean().cpu())
 
         r_ma = float(np.mean(ep_returns_ma)) if ep_returns_ma else float("nan")
         i_ma = float(np.mean(ep_ious_ma)) if ep_ious_ma else float("nan")
+        t_ma = (
+            float(np.nanmean(np.asarray(list(ep_teacher_ma), dtype=np.float64)))
+            if ep_teacher_ma
+            else float("nan")
+        )
         c_ma = float(np.mean(ep_comps_ma)) if ep_comps_ma else float("nan")
         f_ma = float(np.mean(ep_full_frac_ma)) if ep_full_frac_ma else float("nan")
         lam_s = env.lambda_cost
         lr_now = float(opt.param_groups[0]["lr"])
 
+        t_msg = f" tchr={t_ma:.4f}" if ep_teacher_ma and not np.isnan(t_ma) else ""
         msg = (
             f"[metrics] step={step} ε={eps:.4f} λ={lam_s:.4f} lr={lr_now:.2e} buf={buf_n} | "
             f"loss={loss_m:.5f} td_abs={td_m:.5f} |grad|={gn_m:.4f} | "
             f"Q(s,a)={q_pm:.4f} Q_tgt={q_tm:.4f} | "
-            f"ep_ma{metrics_ma_episodes}: ret={r_ma:.2f} iou={i_ma:.4f} "
+            f"ep_ma{metrics_ma_episodes}: ret={r_ma:.2f} cons={i_ma:.4f}{t_msg} "
             f"comp={c_ma:.2f} full%={f_ma:.3f} | episodes={episodes_done}"
         )
         tqdm.write(msg)
@@ -210,6 +258,7 @@ def train_stage2(
                     f"{q_tm:.8f}" if not np.isnan(q_tm) else "",
                     f"{r_ma:.8f}" if not np.isnan(r_ma) else "",
                     f"{i_ma:.8f}" if not np.isnan(i_ma) else "",
+                    f"{t_ma:.8f}" if ep_teacher_ma and not np.isnan(t_ma) else "",
                     f"{c_ma:.8f}" if not np.isnan(c_ma) else "",
                     f"{f_ma:.8f}" if not np.isnan(f_ma) else "",
                     episodes_done,
@@ -222,9 +271,7 @@ def train_stage2(
         grad_norms_since_log = []
 
     while step < total_steps:
-        eps = epsilon_end + (epsilon_start - epsilon_end) * max(
-            0.0, 1.0 - step / float(max(1, epsilon_decay_steps))
-        )
+        eps = epsilon_at(step)
         obs_for_policy = obs.astype(np.float32)
         if policy_obs_noise_std > 0:
             obs_for_policy = obs_for_policy + rng.normal(
@@ -233,7 +280,10 @@ def train_stage2(
         a = select_action_epsilon_greedy(q, obs_for_policy, eps, 3, dev, rng)
         next_obs, r, term, trunc, info = env.step(a)
         done = term or trunc
-        buf.push(obs, a, r, next_obs, done)
+        if nstep_bridge is not None:
+            nstep_bridge.add(obs, a, r, next_obs, done)
+        else:
+            buf.push(obs, a, r, next_obs, done)
         ep_return += r
         ep_len += 1
         ep_actions.append(int(a))
@@ -246,7 +296,10 @@ def train_stage2(
             n_full = sum(1 for x in ep_actions if x == 0)
             full_frac = n_full / max(ep_len, 1)
             ep_returns_ma.append(ep_return)
-            ep_ious_ma.append(float(info.get("episode_mean_iou", 0.0)))
+            ep_ious_ma.append(
+                float(info.get("episode_mean_consistency", info.get("episode_mean_iou", 0.0)))
+            )
+            ep_teacher_ma.append(float(info.get("episode_mean_iou_teacher", float("nan"))))
             ep_comps_ma.append(float(info.get("episode_compute", 0.0)))
             ep_full_frac_ma.append(full_frac)
 
@@ -256,14 +309,28 @@ def train_stage2(
                 lam = float(np.clip(new_lam, lambda_min, lambda_max))
                 env.lambda_cost = lam
 
+            t_ep = float(info.get("episode_mean_iou_teacher", float("nan")))
+            if (
+                lambda_teacher_iou_floor is not None
+                and not np.isnan(t_ep)
+                and float(t_ep) < float(lambda_teacher_iou_below)
+            ):
+                lam = max(lam, float(lambda_teacher_iou_floor))
+                lam = float(np.clip(lam, lambda_min, lambda_max))
+                env.lambda_cost = lam
+
+            t_post = {}
+            if not np.isnan(t_ep):
+                t_post["tchr"] = f"{t_ep:.3f}"
             pbar.set_postfix(
                 ret=f"{ep_return:.2f}",
                 len=ep_len,
-                iou=f"{info.get('episode_mean_iou', 0):.3f}",
+                cons=f"{info.get('episode_mean_consistency', info.get('episode_mean_iou', 0)):.3f}",
                 comp=f"{info.get('episode_compute', 0):.1f}",
                 full=f"{100*full_frac:.0f}%",
                 eps=f"{eps:.2f}",
                 lam=f"{env.lambda_cost:.2f}",
+                **t_post,
             )
             obs, _ = env.reset()
             ep_return = 0.0
@@ -285,7 +352,7 @@ def train_stage2(
                     next_online = q(no)
                     next_act = next_online.argmax(dim=1, keepdim=True)
                     q_next = target(no).gather(1, next_act).squeeze(1)
-                    target_q = r + gamma * (1.0 - d) * q_next
+                    target_q = r + gamma_bootstrap * (1.0 - d) * q_next
                 loss = nn.functional.smooth_l1_loss(q_sa, target_q, beta=huber_beta)
                 opt.zero_grad()
                 loss.backward()
@@ -306,6 +373,9 @@ def train_stage2(
 
         if log_every > 0 and step % log_every == 0:
             log_metrics()
+
+    if nstep_bridge is not None:
+        nstep_bridge.flush_terminal()
 
     pbar.close()
     if log_every > 0 and step > 0 and step % log_every != 0:
@@ -335,6 +405,16 @@ def train_stage2(
             "obs_noise_std": obs_noise_std,
             "policy_obs_noise_std": policy_obs_noise_std,
             "target_tau": target_tau,
+            "ssf_reward_penalty": float(ssf_reward_penalty),
+            "n_step": int(n_step),
+            "epsilon_tail": float(epsilon_tail)
+            if epsilon_tail is not None
+            else None,
+            "epsilon_tail_steps": int(epsilon_tail_steps),
+            "lambda_teacher_iou_floor": float(lambda_teacher_iou_floor)
+            if lambda_teacher_iou_floor is not None
+            else None,
+            "lambda_teacher_iou_below": float(lambda_teacher_iou_below),
         },
         save_path,
     )
@@ -355,10 +435,25 @@ def main() -> None:
     elif not hasattr(args, "use_cosine_lr"):
         args.use_cosine_lr = False
 
-    if not DEFAULT_TEACHER_NPZ.is_file():
-        raise SystemExit("缺少 teacher，请先: python -m stage_1.main preprocess")
+    vp = Path(args.video_path) if args.video_path is not None else VIDEO_PATH
+    if not vp.is_file():
+        raise SystemExit(f"找不到训练视频: {vp}")
+    tn = None
+    if getattr(args, "no_teacher_reward", False):
+        print("[info] --no-teacher-reward：自监督光流奖励，不加载 teacher")
+    elif args.teacher_npz is not None:
+        tnp = Path(args.teacher_npz)
+        if tnp.is_file():
+            tn = tnp
+        else:
+            print(f"[warn] --teacher-npz 不存在 ({tnp})，按无 teacher 训练")
+    elif DEFAULT_TEACHER_NPZ.is_file():
+        tn = DEFAULT_TEACHER_NPZ
+        print(f"[info] 使用默认 teacher 参与奖励: {tn}")
 
     train_stage2(
+        video_path=vp,
+        teacher_npz=tn,
         stack_k=args.stack_k,
         ablation=args.ablation,
         total_steps=args.total_steps,
@@ -399,6 +494,14 @@ def main() -> None:
         grad_updates=args.grad_updates,
         preset_name=str(args.preset),
         stage2_preset_name=str(args.stage2_preset),
+        ssf_reward_penalty=float(getattr(args, "ssf_reward_penalty", 0.0)),
+        n_step=int(getattr(args, "n_step", 1)),
+        epsilon_tail=getattr(args, "epsilon_tail", None),
+        epsilon_tail_steps=int(getattr(args, "epsilon_tail_steps", 0)),
+        lambda_teacher_iou_floor=getattr(args, "lambda_teacher_iou_floor", None),
+        lambda_teacher_iou_below=float(
+            getattr(args, "lambda_teacher_iou_below", 0.35)
+        ),
     )
 
 

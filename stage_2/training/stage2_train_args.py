@@ -90,6 +90,43 @@ def build_stage2_train_argparser(*, add_help: bool = True) -> argparse.ArgumentP
         default="none",
         help="观测消融：none, no_frame_diff, no_velocity, no_iou, no_ssf, bbox_only, ...",
     )
+    # research_targets.md §6.2：奖励 / λ / TD / 探索
+    p.add_argument(
+        "--ssf-reward-penalty",
+        type=float,
+        default=0.0,
+        help="对距上次 FULL 归一化步数加惩罚：reward -= coeff * ssf_norm（0=关闭）",
+    )
+    p.add_argument(
+        "--n-step",
+        type=int,
+        default=1,
+        help="n-step TD 的 n（1=标准 1-step；如 3 需 replay 中 n 步回报）",
+    )
+    p.add_argument(
+        "--epsilon-tail",
+        type=float,
+        default=None,
+        help="主 ε 衰减结束后，再线性退火到该值（None=不退火）",
+    )
+    p.add_argument(
+        "--epsilon-tail-steps",
+        type=int,
+        default=0,
+        help="与 --epsilon-tail 配合：退火步数（0=关闭）",
+    )
+    p.add_argument(
+        "--lambda-teacher-iou-floor",
+        type=float,
+        default=None,
+        help="episode 平均 teacher IoU 低于阈值时，将 λ 至少抬到该值（None=关闭；需 teacher 奖励）",
+    )
+    p.add_argument(
+        "--lambda-teacher-iou-below",
+        type=float,
+        default=0.35,
+        help="触发 --lambda-teacher-iou-floor 的 teacher IoU 上界（低于则抬 λ）",
+    )
     return p
 
 

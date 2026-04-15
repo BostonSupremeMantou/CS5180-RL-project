@@ -1,0 +1,10 @@
+policy_id,policy_name,mean_return,mean_consistency,mean_iou_teacher,mean_cost,n_episodes,lambda_cost,ckpt_path
+always_full,Baseline: always FULL_DETECT,121.30385409900347,0.9565192704950182,nan,1.0,10,0.35,
+periodic_5,Baseline: periodic FULL every 5 (else REUSE),176.71055491597335,0.9535527745798665,nan,0.2,10,0.35,
+flow_only,Baseline: optical flow only (LIGHT_UPDATE),182.49999999999935,1.0,nan,0.25,10,0.35,
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_baseline62_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_baseline62_notchr.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_combo_ssf_n3_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_combo_ssf_n3_notchr.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_epstail_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_epstail_notchr.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_ioufloor_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_ioufloor_notchr.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_nstep3_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_nstep3_notchr.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_ssf05_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_ssf05_notchr.pt
