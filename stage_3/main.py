@@ -7,7 +7,7 @@ Stage 3 入口（仓库根目录）:
   python -m stage_3.main collect
   python -m stage_3.main compare --lambda-from-ckpt --out-csv stage_3/outputs/eval_all_methods_teacher.csv --teacher-npz <npz>
 
-说明见 stage_3/README.md 与 research_targets.md §6.1。
+说明见 stage_3/README.md 与 old_research_targets.md §6.1。
 """
 
 from __future__ import annotations

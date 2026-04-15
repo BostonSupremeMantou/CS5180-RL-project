@@ -1,4 +1,4 @@
-# Stage 5 — `research_targets.md` §6.4
+# Stage 5 — `old_research_targets.md` §6.4
 
 在 **`FishTrackingEnv` + Stage2 堆叠（`stack_k=4`）+ `stage2_robust` 超参** 下，实现四种与 §6.4 对齐的增量；**不重复** Stage1–4 训练。评估阶段 **直接加载** 已有 `stage_4/checkpoints/dqn_stage4_baseline62_teacher.pt`（及 `_notchr`）作为对照行。
 

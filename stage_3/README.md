@@ -1,6 +1,6 @@
 # Stage 3 — §6.1 实验编排（stack_k / 消融 / 网格）
 
-在 **不改动 Stage1/2 核心算法** 的前提下，用子进程批量调用 `stage_2.training.train_stage2`，系统化跑 **research_targets.md 第 6.1 节** 中的扫描实验，并汇总指标。
+在 **不改动 Stage1/2 核心算法** 的前提下，用子进程批量调用 `stage_2.training.train_stage2`，系统化跑 **old_research_targets.md 第 6.1 节** 中的扫描实验，并汇总指标。
 
 ## 目录
 

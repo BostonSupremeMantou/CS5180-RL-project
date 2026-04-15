@@ -90,7 +90,7 @@ def build_stage2_train_argparser(*, add_help: bool = True) -> argparse.ArgumentP
         default="none",
         help="观测消融：none, no_frame_diff, no_velocity, no_iou, no_ssf, bbox_only, ...",
     )
-    # research_targets.md §6.2：奖励 / λ / TD / 探索
+    # old_research_targets.md §6.2：奖励 / λ / TD / 探索
     p.add_argument(
         "--ssf-reward-penalty",
         type=float,

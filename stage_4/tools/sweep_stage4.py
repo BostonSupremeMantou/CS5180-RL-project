@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-research_targets.md §6.2：奖励/λ 修正、n-step TD、ε 尾部退火。
+old_research_targets.md §6.2：奖励/λ 修正、n-step TD、ε 尾部退火。
 
 通过子进程调用 `python -m stage_2.training.train_stage2`，权重写入
 `stage_4/checkpoints/`，曲线写入 `stage_4/outputs/`。

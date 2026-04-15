@@ -4,7 +4,7 @@ Stage 4 入口（仓库根目录）:
   python -m stage_4.main standard --quick --device mps
   python -m stage_4.main collect
 
-说明见 stage_4/README.md 与 research_targets.md §6.2。
+说明见 stage_4/README.md 与 old_research_targets.md §6.2。
 """
 
 from __future__ import annotations

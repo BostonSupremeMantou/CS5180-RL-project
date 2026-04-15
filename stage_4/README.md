@@ -1,6 +1,6 @@
 # Stage 4 — §6.2 中等成本拓展
 
-对应 **`research_targets.md` 第 6.2 节**：在 **同一 Dueling + Double DQN + Stage2 堆叠架构** 下，可选启用：
+对应 **`old_research_targets.md` 第 6.2 节**：在 **同一 Dueling + Double DQN + Stage2 堆叠架构** 下，可选启用：
 
 | 机制 | CLI | 说明 |
 |------|-----|------|

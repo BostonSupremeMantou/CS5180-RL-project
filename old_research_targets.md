@@ -138,7 +138,7 @@
 - **`rl_cv_project.md`**：路线图与 Stage 说明；若与当前实现不一致，以**代码与 `README`** 为准，或逐步同步。
 - **`stage_1/README.md` / `stage_2/README.md`**：命令行入口与目录说明。
 
-本文件 **`research_targets.md`** 侧重「**要证明什么、已经证明了什么、还能往哪扩**」，不替代上述技术细节文档。
+本文件 **`old_research_targets.md`** 侧重「**要证明什么、已经证明了什么、还能往哪扩**」，不替代上述技术细节文档。
 
 ---
 

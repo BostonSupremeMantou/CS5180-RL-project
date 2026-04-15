@@ -1,4 +1,4 @@
-"""Stage 5：research_targets.md §6.4（PER / Soft Q / C51 / GRU）。"""
+"""Stage 5：old_research_targets.md §6.4（PER / Soft Q / C51 / GRU）。"""
 
 from __future__ import annotations
 

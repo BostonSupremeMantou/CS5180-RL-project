@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-research_targets.md §6.1：对 Stage2 训练做网格/扫描编排。
+old_research_targets.md §6.1：对 Stage2 训练做网格/扫描编排。
 
 通过子进程调用 `python -m stage_2.training.train_stage2`，将权重与 metrics
 写入 stage_3/checkpoints 与 stage_3/outputs，并维护 sweep_manifest.csv。
@@ -355,7 +355,7 @@ def collect_summary(
     print(f"[ok] 汇总 {len(rows)} 行 -> {out_csv}")
 
 
-# 与 research_targets / Stage1 v2 对齐的「标准」stack_k 扫描（ablation=none）
+# 与 old_research_targets / Stage1 v2 对齐的「标准」stack_k 扫描（ablation=none）
 STANDARD_STACK_KS: tuple[int, ...] = (1, 2, 4, 8)
 STANDARD_ABLATION = "none"
 
