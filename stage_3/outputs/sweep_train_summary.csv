@@ -1,5 +1,0 @@
-buffer_size,ep_comp_ma,ep_consistency_ma,ep_full_frac_ma,ep_ret_ma,ep_teacher_iou_ma,episodes_done,epsilon,grad_norm_mean,lambda_cost,loss_mean,lr,metrics_csv,q_pred_mean,q_target_mean,step,td_abs_mean
-72000,42.275,0.95650013,0.18701376,158.84084408,0.85578495,384,0.06,2.72292075,0.25,2.20485763,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_3/outputs/train_metrics_sk1_ablnone.csv,73.47064972,72.40365601,72000,2.65910592
-72000,40.2875,0.95485644,0.18719326,161.79772661,0.86857215,384,0.06,2.66329403,0.25,2.08721637,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_3/outputs/train_metrics_sk2_ablnone.csv,74.69971466,74.84474182,72000,2.53836736
-72000,44.8375,0.95765761,0.19176444,160.95667466,0.86936452,384,0.06,2.75937796,0.25,2.04290955,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_3/outputs/train_metrics_sk4_ablnone.csv,75.18830109,73.89144135,72000,2.49255169
-72000,55.5375,0.95495749,0.26339725,164.78858916,0.90353444,384,0.06,2.73146206,0.25,2.05636355,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_3/outputs/train_metrics_sk8_ablnone.csv,74.87915039,73.99427032,72000,2.50632515

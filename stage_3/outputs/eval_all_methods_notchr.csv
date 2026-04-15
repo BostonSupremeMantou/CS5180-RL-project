@@ -1,8 +1,0 @@
-policy_id,policy_name,mean_return,mean_consistency,mean_iou_teacher,mean_cost,n_episodes,lambda_cost
-always_full,Baseline: always FULL_DETECT,121.30385409900347,0.9565192704950182,nan,1.0,10,0.35
-periodic_5,Baseline: periodic FULL every 5 (else REUSE),176.71055491597335,0.9535527745798665,nan,0.2,10,0.35
-flow_only,Baseline: optical flow only (LIGHT_UPDATE),182.49999999999935,1.0,nan,0.25,10,0.35
-dqn_stage3_sk1,DQN Stage3 stack_k=1 ablation=none (dqn_stage3_sk1_ablnone.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25
-dqn_stage3_sk2,DQN Stage3 stack_k=2 ablation=none (dqn_stage3_sk2_ablnone.pt),192.2977724130838,0.965738862065419,nan,0.017,10,0.25
-dqn_stage3_sk4,DQN Stage3 stack_k=4 ablation=none (dqn_stage3_sk4_ablnone.pt),191.69967820131012,0.9657483910065505,nan,0.029000000000000005,10,0.25
-dqn_stage3_sk8,DQN Stage3 stack_k=8 ablation=none (dqn_stage3_sk8_ablnone.pt),197.345001931236,0.9887250096561802,nan,0.008,10,0.25

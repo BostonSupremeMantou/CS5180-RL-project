@@ -1,9 +1,0 @@
-policy_id,policy_name,mean_return,mean_consistency,mean_iou_teacher,mean_cost,n_episodes,lambda_cost,ckpt_path
-always_full,Baseline: always FULL_DETECT,130.00000000000048,0.9292037739169242,1.0,1.0,10,0.35,
-periodic_5,Baseline: periodic FULL every 5 (else REUSE),160.26894244778023,0.9233297555693746,0.871344712238901,0.2,10,0.35,
-flow_only,Baseline: optical flow only (LIGHT_UPDATE),32.22535438755026,1.0,0.24862677193775135,0.25,10,0.35,
-stage4_baseline62,Stage4 §6.2 baseline62 reuse (dqn_stage4_baseline62_teacher.pt),118.34779510290298,0.966634856706945,0.5972389755145148,0.022,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_baseline62_teacher.pt
-s5_c51,Stage5 §6.4 c51 (dqn_stage5_c51_teacher.pt),162.34638080479186,0.9640966492832677,0.9255670107763988,0.437,10,0.2604922351314409,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_c51_teacher.pt
-s5_gru,Stage5 §6.4 gru (dqn_stage5_gru_teacher.pt),49.65925574522944,0.9873311607174392,0.24904627872614715,0.003,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_gru_teacher.pt
-s5_per,Stage5 §6.4 per (dqn_stage5_per_teacher.pt),112.80048311121166,0.9678307932026561,0.5685024155560583,0.018000000000000006,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_per_teacher.pt
-s5_softq,Stage5 §6.4 softq (dqn_stage5_softq_teacher.pt),41.095384939278325,0.9901081751682712,0.20547692469639162,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_softq_teacher.pt

@@ -16,24 +16,20 @@ build/
 .DS_Store
 *.swp
 
-# Checkpoints / logs (optional: remove if you want to track)
-# checkpoints/
-# results/logs/
+# Reference tree (was repo root; patterns mirror previous root ignores)
+old_versions/archive/
+old_versions/data/
+old_versions/first_attempt/fish_yolo_dataset/
+old_versions/first_attempt/runs/
+old_versions/first_attempt/fish_data.yaml
+old_versions/stage_1/checkpoints/*.pt
+old_versions/stage_1/data/teacher/*.npz
+old_versions/stage_2/checkpoints/**/*.pt
+old_versions/stage_3/checkpoints/**/*.pt
+old_versions/stage_4/checkpoints/**/*.pt
+old_versions/stage_5/checkpoints/**/*.pt
 
-﻿# Full video archive (use data/ for the 25 curated videos only)
-archive/
-
-# Raw and processed gesture data (repo root only; stage_1/data is tracked)
-/data/
-
-# YOLO fish training (generated)
-first_attempt/fish_yolo_dataset/
-first_attempt/runs/
-first_attempt/fish_data.yaml
-
-# Stage 1 generated artifacts
-/stage_1/checkpoints/*.pt
-/stage_1/data/teacher/*.npz
-
-# Stage 2 generated artifacts
-/stage_2/checkpoints/**/*.pt
+# new tree — big binaries (keep small baseline.npz tracked if you want)
+weights/**/*.pt
+weights/**/*.onnx
+outputs/**/*.pt

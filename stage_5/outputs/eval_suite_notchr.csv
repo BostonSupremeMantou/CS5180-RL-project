@@ -1,9 +1,0 @@
-policy_id,policy_name,mean_return,mean_consistency,mean_iou_teacher,mean_cost,n_episodes,lambda_cost,ckpt_path
-always_full,Baseline: always FULL_DETECT,121.30385409900347,0.9565192704950182,nan,1.0,10,0.35,
-periodic_5,Baseline: periodic FULL every 5 (else REUSE),176.71055491597335,0.9535527745798665,nan,0.2,10,0.35,
-flow_only,Baseline: optical flow only (LIGHT_UPDATE),182.49999999999935,1.0,nan,0.25,10,0.35,
-stage4_baseline62,Stage4 §6.2 baseline62 reuse (dqn_stage4_baseline62_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_baseline62_notchr.pt
-s5_c51,Stage5 §6.4 c51 (dqn_stage5_c51_notchr.pt),182.17648745893837,0.9658199372946916,nan,0.21974999999999997,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_c51_notchr.pt
-s5_gru,Stage5 §6.4 gru (dqn_stage5_gru_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_gru_notchr.pt
-s5_per,Stage5 §6.4 per (dqn_stage5_per_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_per_notchr.pt
-s5_softq,Stage5 §6.4 softq (dqn_stage5_softq_notchr.pt),198.45731529412714,0.9922865764706359,nan,0.0,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_5/checkpoints/dqn_stage5_softq_notchr.pt
