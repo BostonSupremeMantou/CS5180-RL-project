@@ -32,7 +32,7 @@ Each top-level directory has a short **`README.md`** describing what I keep ther
 | `utilities/` | Shared helpers (paths, env, replay, plotting, …) |
 | `agents/` | Policies: `no_learning_agents/`, `RL_agents/<group>/` |
 | `src/` | Runnable entrypoints (`train`, `evaluate`, `final_eval`, plotting) |
-| `final_report/` | Paper source (`final_report.tex`) and paper plots |
+| `final_report/` | Paper source (`final_report.tex`) and paper plots *(entire directory is gitignored; keep locally or publish separately)* |
 | `old_versions/` | Legacy tree; not wired into the current pipeline |
 
 ## 2. Environment setup
