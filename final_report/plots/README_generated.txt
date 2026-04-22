@@ -1,0 +1,1 @@
+Generated for final report plots from eval_raw.csv / eval_summary.csv.\nAdded files: 05_pareto_iou_cost.png, 06_return_vs_cost_scatter.png,\n07_composite_score_ranking.png, 08_episode_variability_boxplots.png,\n09_top5_radar_profile.png, 10_normalized_metric_heatmap.png\n

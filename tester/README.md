@@ -1,15 +1,25 @@
 # tester
 
-Run from **repository root**:
+I keep my **pytest suite** here—fast unit tests plus a couple of optional integration checks.
+
+## How I run it
+
+From the **repo root**:
 
 ```bash
-source .venv/bin/activate   # optional
+source .venv/bin/activate   # optional but I usually do it
 pip install -r requirements.txt
 pytest tester
 ```
 
-- **Fast tests**: buffers, n-step bridge, PER SumTree, geometry, ablation masks, dummy env + wrappers, `rollout`, torch helpers, NN forwards, registry, baseline policy, CLI `--help`, plot CSV → PNG (needs `matplotlib`).
-- **Optional integration**: `test_fish_env_optional.py` runs only if `utilities.paths.default_video_path()` and `default_yolo_weights()` exist.
+## What I’m actually testing
 
-Verbose: `pytest tester -v`  
-One file: `pytest tester/test_replay_buffer.py -v`
+- **Fast stuff**: replay buffer, n-step bridge, PER SumTree, geometry helpers, ablation masks, dummy env + wrappers, rollout code, torch helpers, NN forward passes, RL registry, baseline policy behavior, CLI `--help`, and “CSV → PNG” plotting (needs `matplotlib`).
+- **Optional integration**: `test_fish_env_optional.py` only runs if `utilities.paths` can find a real video + YOLO weights on disk—I skip it on CI sometimes.
+
+## Handy variants
+
+```bash
+pytest tester -v
+pytest tester/test_replay_buffer.py -v
+```

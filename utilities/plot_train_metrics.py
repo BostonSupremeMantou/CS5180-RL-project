@@ -96,9 +96,9 @@ def plot_train_metrics_csv(csv_path: Path, out_dir: Path) -> list[Path]:
     if "ep_consistency_ma" in d:
         ma_series.append(("ep_consistency_ma", d["ep_consistency_ma"], "C1"))
     if "ep_teacher_iou_ma" in d:
-        ma_series.append(("ep_teacher_iou_ma", d["ep_teacher_iou_ma"], "C4"))
+        ma_series.append(("baseline IoU MA", d["ep_teacher_iou_ma"], "C4"))
     title_ma = "Episode MA: return & consistency"
-    if any(s[0] == "ep_teacher_iou_ma" for s in ma_series):
+    if "ep_teacher_iou_ma" in d:
         title_ma = "Episode MA: return, consistency & baseline IoU"
     if ma_series:
         plot_xy("train_episode_ma_ret_iou.png", title_ma, "value", ma_series)
