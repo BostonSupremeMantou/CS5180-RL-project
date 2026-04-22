@@ -1,0 +1,39 @@
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# IDE / OS
+.idea/
+.DS_Store
+*.swp
+
+# Checkpoints / logs (optional: remove if you want to track)
+# checkpoints/
+# results/logs/
+
+﻿# Full video archive (use data/ for the 25 curated videos only)
+archive/
+
+# Raw and processed gesture data (repo root only; stage_1/data is tracked)
+/data/
+
+# YOLO fish training (generated)
+first_attempt/fish_yolo_dataset/
+first_attempt/runs/
+first_attempt/fish_data.yaml
+
+# Stage 1 generated artifacts
+/stage_1/checkpoints/*.pt
+/stage_1/data/teacher/*.npz
+
+# Stage 2 generated artifacts
+/stage_2/checkpoints/**/*.pt

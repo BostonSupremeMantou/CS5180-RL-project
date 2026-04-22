@@ -1,0 +1,7 @@
+buffer_size,ep_comp_ma,ep_consistency_ma,ep_full_frac_ma,ep_ret_ma,ep_teacher_iou_ma,episodes_done,epsilon,grad_norm_mean,lambda_cost,loss_mean,lr,metrics_csv,q_pred_mean,q_target_mean,step,td_abs_mean
+72000,44.8375,0.95765761,0.19176444,160.95667466,0.86936452,384,0.06,2.75937796,0.25,2.04290955,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_4/outputs/train_metrics_baseline62_teacher.csv,75.18830109,73.89144135,72000,2.49255169
+71998,57.45,0.95738682,0.25216001,165.56336714,0.91160907,384,0.06,2.90703271,0.25,2.77965016,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_4/outputs/train_metrics_combo_ssf_n3_teacher.csv,77.36455536,73.72408295,72000,3.22798132
+72000,40.6875,0.95688794,0.17633026,160.93338924,0.86397141,384,0.03,2.76328222,0.25,2.03638105,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_4/outputs/train_metrics_epstail_teacher.csv,75.51187897,75.68151093,72000,2.48649975
+72000,44.8375,0.95765761,0.19176444,160.95667466,0.86936452,384,0.06,2.75937796,0.25,2.04290955,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_4/outputs/train_metrics_ioufloor_teacher.csv,75.18830109,73.89144135,72000,2.49255169
+71998,60.2125,0.95776911,0.26568049,165.87089013,0.91510223,384,0.06,2.86657243,0.25,2.77642107,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_4/outputs/train_metrics_nstep3_teacher.csv,77.69429016,73.76569366,72000,3.22477097
+72000,48.0375,0.95690183,0.21243956,161.76623363,0.8795597,384,0.06,2.79683743,0.25,2.07917222,1e-06,/Users/canhe/dev/CS5180/RL_project/stage_4/outputs/train_metrics_ssf05_teacher.csv,74.87319183,73.54557037,72000,2.53001869

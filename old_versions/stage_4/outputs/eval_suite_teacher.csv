@@ -1,0 +1,10 @@
+policy_id,policy_name,mean_return,mean_consistency,mean_iou_teacher,mean_cost,n_episodes,lambda_cost,ckpt_path
+always_full,Baseline: always FULL_DETECT,130.00000000000048,0.9292037739169242,1.0,1.0,10,0.35,
+periodic_5,Baseline: periodic FULL every 5 (else REUSE),160.26894244778023,0.9233297555693746,0.871344712238901,0.2,10,0.35,
+flow_only,Baseline: optical flow only (LIGHT_UPDATE),32.22535438755026,1.0,0.24862677193775135,0.25,10,0.35,
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_baseline62_teacher.pt),118.34779510290298,0.966634856706945,0.5972389755145148,0.022,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_baseline62_teacher.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_combo_ssf_n3_teacher.pt),123.60174413899162,0.966459878014223,0.6230087206949577,0.02,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_combo_ssf_n3_teacher.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_epstail_teacher.pt),119.42934751613738,0.9668187988337632,0.6023967375806871,0.020999999999999998,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_epstail_teacher.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_ioufloor_teacher.pt),118.34779510290298,0.966634856706945,0.5972389755145148,0.022,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_ioufloor_teacher.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_nstep3_teacher.pt),85.03600443419482,0.9765139942953341,0.42780502217097405,0.0105,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_nstep3_teacher.pt
+dqn_stage2_sk4,DQN Stage2 stack_k=4 ablation=none (dqn_stage4_ssf05_teacher.pt),115.56599981099161,0.9673220874359203,0.5828299990549579,0.019999999999999997,10,0.25,/Users/canhe/dev/CS5180/RL_project/stage_4/checkpoints/dqn_stage4_ssf05_teacher.pt

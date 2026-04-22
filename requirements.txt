@@ -1,0 +1,12 @@
+mediapipe
+opencv-python
+numpy
+torch
+torchvision
+ultralytics
+gymnasium>=0.29.0
+tqdm
+PyYAML
+matplotlib>=3.7.0
+pytest>=8.0.0
+
