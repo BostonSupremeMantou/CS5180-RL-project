@@ -34,6 +34,6 @@ weights/**/*.pt
 weights/**/*.onnx
 outputs/**/*.pt
 presentation/
-final_report/drafts/instructions.md
-final_report/drafts/final_report_grading_criteria.md
-final_report/drafts/final_report_checklist.md
+
+# Final report (LaTeX, PDF, plots, references — keep local only)
+final_report/
